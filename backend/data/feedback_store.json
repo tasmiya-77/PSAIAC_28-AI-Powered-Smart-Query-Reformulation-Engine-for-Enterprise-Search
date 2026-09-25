@@ -1,0 +1,57 @@
+[
+  {
+    "feedback_id": "fb_4b1b78d1b0",
+    "query": "how to optimize chromadb vector store performance in fastpi",
+    "reformulated_query": "how to optimize chromadb vector store performance in fastpi",
+    "document_id": "doc_3d84a3e2040b",
+    "chunk_id": "doc_3d84a3e2040b_chunk_0",
+    "filename": "doc_3d84a3e2040b",
+    "rating": "helpful",
+    "feedback_text": "Great search result detailing RRF and BGE cross-encoder reranking!",
+    "timestamp": "2026-09-24T16:55:42.856856Z"
+  },
+  {
+    "feedback_id": "fb_135ab6db2f",
+    "query": "how to optimize chromadb vector store performance in fastpi",
+    "reformulated_query": "how to optimize chromadb vector store performance in fastpi",
+    "document_id": "doc_779b9b9f78f9",
+    "chunk_id": "doc_779b9b9f78f9_chunk_0",
+    "filename": "doc_779b9b9f78f9",
+    "rating": "helpful",
+    "feedback_text": "Great search result detailing RRF and BGE cross-encoder reranking!",
+    "timestamp": "2026-09-24T16:52:49.577412Z"
+  },
+  {
+    "feedback_id": "fb_0d66e4040e",
+    "query": "how to optimize chromadb vector store performance in fastpi",
+    "reformulated_query": "how to optimize chromadb vector store performance in fastpi",
+    "document_id": "doc_933ddda13b91",
+    "chunk_id": "doc_933ddda13b91_chunk_0",
+    "filename": "doc_933ddda13b91",
+    "rating": "helpful",
+    "feedback_text": "Great search result detailing RRF and BGE cross-encoder reranking!",
+    "timestamp": "2026-09-24T16:50:24.613918Z"
+  },
+  {
+    "feedback_id": "fb_34802a779a",
+    "query": "nextjs 15 app router suspense boundaries",
+    "reformulated_query": "nextjs app router suspense boundaries configuration",
+    "document_id": "doc_nextjs_999",
+    "chunk_id": "doc_nextjs_999_chunk_0",
+    "filename": "legacy_react_guide.txt",
+    "rating": "not_helpful",
+    "feedback_text": "Result describes React 17 legacy router, not Next.js 15.",
+    "timestamp": "2026-08-18T06:12:06.342403Z"
+  },
+  {
+    "feedback_id": "fb_018082b847",
+    "query": "how to optimize postgresql vector index latency in fastapi",
+    "reformulated_query": "how to optimize postgresql vector similarity latency in fastapi",
+    "document_id": "doc_postgres_123",
+    "chunk_id": "doc_postgres_123_chunk_0",
+    "filename": "postgres_guide.txt",
+    "rating": "helpful",
+    "feedback_text": "Extremely accurate guide on HNSW index parameters m=16, ef_construction=64!",
+    "timestamp": "2026-08-18T06:12:06.328568Z"
+  }
+]
