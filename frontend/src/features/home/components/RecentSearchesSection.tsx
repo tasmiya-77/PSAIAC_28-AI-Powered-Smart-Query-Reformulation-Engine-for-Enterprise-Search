@@ -1,0 +1,125 @@
+"use client";
+
+import React from "react";
+import { motion } from "framer-motion";
+import { Clock, Trash2, ArrowUpRight, Sparkles, Inbox } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
+import { Badge } from "@/components/ui/Badge";
+
+export interface SearchHistoryItem {
+  id: string;
+  originalQuery: string;
+  expandedTerms: string[];
+  mode: string;
+  timestamp: string;
+  hitCount: number;
+}
+
+interface RecentSearchesSectionProps {
+  history: SearchHistoryItem[];
+  onRemoveItem: (id: string) => void;
+  onClearAll: () => void;
+  onSelectQuery: (query: string) => void;
+}
+
+export const RecentSearchesSection: React.FC<RecentSearchesSectionProps> = ({
+  history,
+  onRemoveItem,
+  onClearAll,
+  onSelectQuery,
+}) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, delay: 0.5 }}
+    >
+      <Card variant="glass">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <div>
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <Clock className="h-5 w-5 text-indigo-400" />
+              Recent Query Reformulations
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Audit log of expanded search terms and retrieval precision
+            </CardDescription>
+          </div>
+
+          {history.length > 0 && (
+            <button
+              onClick={onClearAll}
+              className="flex items-center gap-1 text-xs text-slate-500 hover:text-rose-500 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Clear History</span>
+            </button>
+          )}
+        </CardHeader>
+
+        <CardContent className="pt-2">
+          {history.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center border border-dashed border-slate-300 dark:border-slate-800 rounded-xl bg-slate-100/40 dark:bg-slate-950/20">
+              <Inbox className="h-10 w-10 text-slate-400 mb-2" />
+              <div className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                No recent queries yet
+              </div>
+              <p className="text-xs text-slate-500 max-w-sm mt-1">
+                Enter a search phrase above or click one of the suggested query chips to start testing query expansion.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {history.map((item) => (
+                <div
+                  key={item.id}
+                  className="group flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-100/60 dark:bg-slate-900/40 hover:border-blue-500/30 transition-all gap-3"
+                >
+                  <div className="space-y-1.5 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span
+                        onClick={() => onSelectQuery(item.originalQuery)}
+                        className="font-medium text-sm text-slate-900 dark:text-slate-100 hover:text-blue-500 cursor-pointer flex items-center gap-1.5"
+                      >
+                        {item.originalQuery}
+                        <ArrowUpRight className="h-3.5 w-3.5 text-slate-400 group-hover:text-blue-500" />
+                      </span>
+                      <Badge variant="outline" className="text-[10px]">
+                        {item.mode}
+                      </Badge>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                      <Sparkles className="h-3 w-3 text-blue-400 shrink-0" />
+                      <span className="font-semibold text-slate-400">Expanded:</span>
+                      {item.expandedTerms.map((term, tIdx) => (
+                        <span
+                          key={tIdx}
+                          className="px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[11px]"
+                        >
+                          {term}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between sm:justify-end gap-3 text-xs text-slate-400 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-800">
+                    <span className="font-mono text-emerald-400">{item.hitCount} hits</span>
+                    <span className="text-[11px] text-slate-500">{item.timestamp}</span>
+                    <button
+                      onClick={() => onRemoveItem(item.id)}
+                      className="p-1 rounded text-slate-500 hover:text-rose-500 hover:bg-slate-800 transition-colors"
+                      title="Remove from history"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+};
