@@ -9,6 +9,8 @@ RUN npm ci
 
 # Copy frontend source code and build production bundle
 COPY . .
+ARG NEXT_PUBLIC_API_BASE_URL
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
 ENV NEXT_TELEMETRY_DISABLED 1
 RUN npm run build
 

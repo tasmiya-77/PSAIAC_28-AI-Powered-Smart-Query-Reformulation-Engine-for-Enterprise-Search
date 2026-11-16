@@ -60,11 +60,13 @@ class HybridRetrievalService:
         self,
         query: str,
         filters: Dict[str, Any] = None,
-        top_k: int = 50
+        top_k: int = 50,
+        original_query: str = None,
     ) -> List[Dict[str, Any]]:
         """
         Execute Hybrid Retrieval (Vector + BM25 Lexical) with RRF score fusion.
-        Retrieves Top 50 candidates.
+        Retrieves Top 50 candidates, combining reformulated query and original query
+        to maximize recall and preserve exact query terms.
         """
         try:
             collection = self.vector_store._get_collection()
@@ -81,9 +83,13 @@ class HybridRetrievalService:
                 elif len(where_clauses) > 1:
                     chroma_where = {"$and": where_clauses}
 
-            # 1. Vector Search via ChromaDB
+            # 1. Multi-Query Vector Search via ChromaDB
+            search_queries = [query]
+            if original_query and original_query.strip() and original_query.strip().lower() != query.strip().lower():
+                search_queries.append(original_query.strip())
+
             query_kwargs = {
-                "query_texts": [query],
+                "query_texts": search_queries,
                 "n_results": min(top_k * 2, max(50, collection.count())),
                 "include": ["documents", "metadatas", "distances"]
             }
@@ -92,17 +98,45 @@ class HybridRetrievalService:
 
             vector_results = collection.query(**query_kwargs)
 
-            vector_docs = vector_results.get("documents", [[]])[0] or []
-            vector_metas = vector_results.get("metadatas", [[]])[0] or []
-            vector_ids = vector_results.get("ids", [[]])[0] or []
-            vector_dists = vector_results.get("distances", [[]])[0] or []
+            # Flatten and deduplicate candidates across query texts
+            res_docs_lists = vector_results.get("documents", []) or []
+            res_metas_lists = vector_results.get("metadatas", []) or []
+            res_ids_lists = vector_results.get("ids", []) or []
+            res_dists_lists = vector_results.get("distances", []) or []
 
-            if not vector_docs:
+            chunk_map = {}
+            for q_idx in range(len(res_docs_lists)):
+                docs_q = res_docs_lists[q_idx] or []
+                metas_q = res_metas_lists[q_idx] or []
+                ids_q = res_ids_lists[q_idx] or []
+                dists_q = res_dists_lists[q_idx] or []
+
+                for i in range(len(docs_q)):
+                    cid = ids_q[i]
+                    cdist = dists_q[i] if i < len(dists_q) else 1.0
+                    if cid not in chunk_map or cdist < chunk_map[cid]["dist"]:
+                        chunk_map[cid] = {
+                            "chunk_id": cid,
+                            "doc": docs_q[i],
+                            "meta": metas_q[i] if i < len(metas_q) else {},
+                            "dist": cdist,
+                        }
+
+            if not chunk_map:
                 return []
 
+            vector_docs = [item["doc"] for item in chunk_map.values()]
+            vector_metas = [item["meta"] for item in chunk_map.values()]
+            vector_ids = [item["chunk_id"] for item in chunk_map.values()]
+            vector_dists = [item["dist"] for item in chunk_map.values()]
 
-            # 2. Compute BM25 Lexical Scores over candidate set
-            bm25_scores = compute_bm25_scores(query, vector_docs)
+            # 2. Compute BM25 Lexical Scores over candidate set (combining reformulated & original queries)
+            bm25_scores_ref = compute_bm25_scores(query, vector_docs)
+            if original_query and original_query.strip():
+                bm25_scores_orig = compute_bm25_scores(original_query, vector_docs)
+                bm25_scores = [max(r, o) for r, o in zip(bm25_scores_ref, bm25_scores_orig)]
+            else:
+                bm25_scores = bm25_scores_ref
 
             # 3. Reciprocal Rank Fusion (RRF)
             # Rank by vector distance (smaller distance = higher rank)
@@ -148,7 +182,7 @@ class HybridRetrievalService:
             # Sort by RRF score descending
             rrf_candidates.sort(key=lambda x: x["rrf_score"], reverse=True)
 
-            logger.info(f"[RETRIEVAL] Hybrid search fetched {len(rrf_candidates[:top_k])} candidates for reformulated query '{query}'")
+            logger.info(f"[RETRIEVAL] Hybrid search fetched {len(rrf_candidates[:top_k])} candidates for query '{query}' (original: '{original_query}')")
             return rrf_candidates[:top_k]
 
 

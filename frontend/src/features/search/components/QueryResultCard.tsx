@@ -22,9 +22,16 @@ export const QueryResultCard: React.FC<QueryResultCardProps> = ({
             Query Expansion & Reformulation Analysis
           </CardTitle>
         </div>
-        <Badge variant="default" className="text-[10px]">
-          Intent: {reformulation.intent}
-        </Badge>
+        <div className="flex items-center gap-2">
+          {reformulation.provider_used && (
+            <Badge variant="outline" className="text-[10px] text-cyan-400 border-cyan-500/30 bg-cyan-950/20">
+              Provider: {reformulation.provider_used}
+            </Badge>
+          )}
+          <Badge variant="default" className="text-[10px]">
+            Intent: {reformulation.intent}
+          </Badge>
+        </div>
       </CardHeader>
 
       <CardContent className="space-y-2.5 text-xs">

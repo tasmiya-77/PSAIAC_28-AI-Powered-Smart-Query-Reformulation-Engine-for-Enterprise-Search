@@ -1,0 +1,12 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+data/chroma/
+*.sqlite3
+.git/
+.vscode/
+.idea/

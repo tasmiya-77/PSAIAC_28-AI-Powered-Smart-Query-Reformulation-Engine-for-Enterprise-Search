@@ -45,6 +45,9 @@ backend/venv/
 backend/.venv/
 backend/env/
 backend/data/chroma/
+backend/data/feedback_store.json
+backend/data/query_history_store.json
+data/
 *.db
 *.sqlite3
 
@@ -53,3 +56,31 @@ backend/data/chroma/
 .idea/
 *.swp
 *.swo
+
+
+# Additional environment protection
+.env.*
+!.env.example
+
+# Vercel
+.vercel/
+
+# Python tooling
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Model and ML caches
+.cache/
+
+# Private documents
+Papers/
+
+# Local application data
+backend/data/*.json
+
+# Environment files
+.env*
+!.env.example
+backend/.env*
+!backend/.env.example

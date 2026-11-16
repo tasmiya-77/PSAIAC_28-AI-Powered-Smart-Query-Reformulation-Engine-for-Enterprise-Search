@@ -55,7 +55,8 @@ async def execute_enterprise_search(request: SearchRequest):
         candidates_top_50 = hybrid_retrieval_service.retrieve_top_50(
             query=effective_query,
             filters=filter_dict,
-            top_k=50
+            top_k=50,
+            original_query=request.query,
         )
 
         # 4. AI Cross-Encoder Reranking (Top 10 most relevant)

@@ -37,6 +37,7 @@ export interface QueryExplainability {
   added_keywords: string[];
   confidence_score: number;
   explanation: string;
+  provider_used?: string;
 }
 
 export interface DocumentListItem {

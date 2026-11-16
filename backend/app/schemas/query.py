@@ -24,6 +24,7 @@ class QueryExplainability(BaseModel):
     added_keywords: List[str] = Field(default_factory=list, description="Keywords injected during expansion")
     confidence_score: float = Field(..., ge=0.0, le=1.0)
     explanation: str = Field(..., description="Detailed rationale for query reformulation decision")
+    provider_used: Optional[str] = Field(default=None, description="LLM provider used for reformulation (e.g. Groq, Cloudflare, Ollama, Gemini, Algorithmic)")
 
 
 class QueryResponse(BaseModel):

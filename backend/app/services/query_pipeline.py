@@ -27,6 +27,49 @@ TECH_SPELL_MAP = {
     "shadcn": "shadcn/ui",
 }
 
+# General-vocabulary conservative spell correction dictionary.
+# Only common, unambiguous single-character transpositions/deletions are listed.
+# Words that are genuinely ambiguous (could be multiple real words) are intentionally omitted.
+GENERAL_SPELL_MAP = {
+    "reume": "resume",
+    "recieve": "receive",
+    "occured": "occurred",
+    "occurance": "occurrence",
+    "seperate": "separate",
+    "definately": "definitely",
+    "accomodate": "accommodate",
+    "begining": "beginning",
+    "beleive": "believe",
+    "calender": "calendar",
+    "comming": "coming",
+    "committment": "commitment",
+    "concious": "conscious",
+    "existance": "existence",
+    "grammer": "grammar",
+    "independant": "independent",
+    "millenium": "millennium",
+    "neccessary": "necessary",
+    "privelege": "privilege",
+    "reccomend": "recommend",
+    "relevent": "relevant",
+    "resposible": "responsible",
+    "succesful": "successful",
+    "tommorow": "tomorrow",
+    "untill": "until",
+    "wierd": "weird",
+    "writting": "writing",
+    "analysys": "analysis",
+    "requrement": "requirement",
+    "managment": "management",
+    "documentaion": "documentation",
+    "performace": "performance",
+    "implmentation": "implementation",
+    "integartion": "integration",
+    "configration": "configuration",
+    "autentication": "authentication",
+    "authoriation": "authorization",
+}
+
 
 def normalize_and_clean_query(raw_query: str) -> str:
     """Step 1: Strip formatting, normalize whitespace, and trim unwanted punctuation."""
@@ -36,7 +79,13 @@ def normalize_and_clean_query(raw_query: str) -> str:
 
 
 def correct_spelling_and_acronyms(query: str) -> Tuple[str, List[str]]:
-    """Step 2: Correct tech typos and expand technical acronyms."""
+    """Step 2: Correct tech typos/acronyms AND common general-vocabulary typos.
+    
+    Tech corrections are always applied silently (they are unambiguous expansions).
+    General corrections are only applied when the misspelling has no other plausible
+    interpretation (conservative list). The corrected_terms list records every change
+    so the caller can surface it to the user if needed.
+    """
     words = query.split()
     corrected_words = []
     corrected_terms = []
@@ -48,6 +97,10 @@ def correct_spelling_and_acronyms(query: str) -> Tuple[str, List[str]]:
             corrected_words.append(corrected_val)
             if corrected_val.lower() != lowered:
                 corrected_terms.append(f"{word} -> {corrected_val}")
+        elif lowered in GENERAL_SPELL_MAP:
+            corrected_val = GENERAL_SPELL_MAP[lowered]
+            corrected_words.append(corrected_val)
+            corrected_terms.append(f"{word} -> {corrected_val}")
         else:
             corrected_words.append(word)
 
@@ -57,15 +110,39 @@ def correct_spelling_and_acronyms(query: str) -> Tuple[str, List[str]]:
 def detect_query_intent(query: str) -> str:
     """Step 3: Detect query intent (TROUBLESHOOTING, TECHNICAL_SEARCH, CONCEPTUAL_EXPLANATION, COMPARISON)."""
     lowered = query.lower()
-    
-    if any(k in lowered for k in ["error", "fix", "issue", "bug", "crash", "latency", "slow", "fail", "timeout", "exception"]):
+    word_count = len(lowered.split())
+
+    # Troubleshooting keywords — highest priority
+    if any(k in lowered for k in ["error", "fix", "issue", "bug", "crash", "latency", "slow", "fail", "timeout", "exception", "not working", "broken"]):
         return "TROUBLESHOOTING"
-    elif any(k in lowered for k in ["vs", "versus", "difference", "compare", "benchmark", "pros and cons"]):
+
+    # Comparison intent
+    if any(k in lowered for k in ["vs", "versus", "difference", "compare", "benchmark", "pros and cons", "trade-off"]):
         return "COMPARISON"
-    elif any(k in lowered for k in ["what is", "how does", "architecture", "overview", "explain", "concept"]):
+
+    # Conceptual / architectural explanation
+    if any(k in lowered for k in ["what is", "how does", "architecture", "overview", "explain", "concept", "definition", "meaning of"]):
         return "CONCEPTUAL_EXPLANATION"
-    else:
+
+    # Document / content retrieval signals (find, search, look up, show)
+    if any(k in lowered for k in ["find", "search for", "look up", "show me", "list", "get", "fetch", "retrieve", "document"]):
+        return "DOCUMENT_SEARCH"
+
+    # Technical search — requires at least one recognized tech indicator
+    tech_indicators = [
+        "api", "sdk", "database", "server", "backend", "frontend", "deploy",
+        "install", "setup", "config", "configure", "integration", "framework",
+        "library", "package", "module", "code", "script", "query", "index",
+        "endpoint", "request", "response", "authentication", "authorization",
+    ]
+    if any(k in lowered for k in tech_indicators):
         return "TECHNICAL_SEARCH"
+
+    # Short queries with no technical signals → general search
+    if word_count <= 3:
+        return "GENERAL_SEARCH"
+
+    return "TECHNICAL_SEARCH"
 
 
 def extract_entities_and_keywords(query: str) -> Tuple[List[str], List[str]]:
@@ -135,33 +212,83 @@ Example output format:
     return None
 
 
+def _strip_leading_verb(query: str, verbs: List[str]) -> str:
+    """Remove a leading action verb from a query to avoid doubled phrases.
+    e.g. strip_leading_verb('fix timeout error', ['fix']) → 'timeout error'
+    Only strips a single leading word when it exactly matches one of the given verbs.
+    """
+    parts = query.split(None, 1)
+    if len(parts) > 1 and parts[0].lower() in verbs:
+        return parts[1]
+    return query
+
+
 def generate_fallback_candidate_queries(
     query: str, intent: str, entities: List[str], keywords: List[str]
 ) -> List[str]:
     """
     Step 5 (Fallback): Algorithmic candidate expansion if Gemini API key is omitted.
-    Generates 5 distinct high-quality search rewrites.
+    Generates 5 distinct, intent-specific search rewrites without blindly appending
+    generic technical suffixes to every query.
     """
     entity_str = " ".join(entities) if entities else ""
-    kw_str = " ".join(keywords[:3]) if keywords else ""
+    kw_str = " ".join(keywords[:3]) if keywords else query
 
-    c1 = f"{query} technical documentation and best practices"
-    
     if intent == "TROUBLESHOOTING":
-        c2 = f"How to resolve {query} error performance latency issue"
-        c3 = f"{query} troubleshooting guide solution and root cause"
-    elif intent == "COMPARISON":
-        c2 = f"{query} performance benchmark trade-offs and comparison"
-        c3 = f"Key differences and evaluation of {query}"
-    elif intent == "CONCEPTUAL_EXPLANATION":
-        c2 = f"Comprehensive explanation of {query} architecture and concepts"
-        c3 = f"Understanding {query} fundamental principles"
-    else: # TECHNICAL_SEARCH
-        c2 = f"{query} implementation code examples and API usage"
-        c3 = f"Vector search optimization for {query}"
+        # Strip leading fix/resolve so we don't produce "How to fix fix …"
+        core = _strip_leading_verb(query, ["fix", "resolve", "repair", "debug", "address"])
+        c1 = f"How to fix {core}"
+        c2 = f"{core} error resolution and root cause analysis"
+        c3 = f"Troubleshooting guide for {core} failure"
+        c4 = f"{query} known issues workaround and patch"
+        c5 = f"Stack trace debugging {entity_str} {kw_str} problem".strip()
 
-    c4 = f"Optimized query: {entity_str} {kw_str} configuration and indexing".strip()
-    c5 = f"Advanced guide: {query} integration pattern"
+    elif intent == "COMPARISON":
+        c1 = f"{query} comparison and evaluation"
+        c2 = f"Differences between {query} — pros and cons"
+        c3 = f"Benchmark and trade-off analysis of {query}"
+        c4 = f"Which is better: {query} — decision guide"
+        c5 = f"{query} feature matrix and use-case suitability"
+
+    elif intent == "CONCEPTUAL_EXPLANATION":
+        # Strip leading "what is / how does" to avoid "Explanation of what is …"
+        core = _strip_leading_verb(query, ["what", "how", "why", "when", "where"])
+        c1 = f"Explanation of {core} concepts and principles"
+        c2 = f"What is {core} and how does it work"
+        c3 = f"{core} architecture overview and fundamentals"
+        c4 = f"Deep dive into {core} design and theory"
+        c5 = f"Beginner guide to understanding {core}"
+
+    elif intent == "DOCUMENT_SEARCH":
+        # Strip leading find/search/get so we don't produce "Documents related to find …"
+        core = _strip_leading_verb(query, ["find", "search", "get", "fetch", "retrieve", "show", "list"])
+        c1 = f"Documents related to {core}"
+        c2 = f"Find {core} report or record"
+        c3 = f"{core} official documentation and reference material"
+        c4 = f"Search results for {core} in enterprise knowledge base"
+        c5 = f"{kw_str} files and content matching {core}".strip()
+
+    elif intent == "GENERAL_SEARCH":
+        # Short, generic or non-technical queries: broaden without adding tech jargon
+        c1 = f"{query}"
+        c2 = f"{query} overview and summary"
+        c3 = f"Information about {query}"
+        c4 = f"{query} examples and use cases"
+        c5 = f"Find documents mentioning {query}"
+
+    else:  # TECHNICAL_SEARCH — only add tech context if there are entities/keywords
+        if entities:
+            tech_context = entity_str
+        elif kw_str:
+            tech_context = kw_str
+        else:
+            tech_context = query
+
+        c1 = f"{query} technical reference and API documentation"
+        c2 = f"{query} implementation examples and code usage"
+        c3 = f"{tech_context} configuration and setup guide"
+        c4 = f"Best practices for {query} in production environments"
+        c5 = f"{query} integration patterns and architecture decisions"
 
     return [c1, c2, c3, c4, c5]
 
@@ -210,10 +337,16 @@ def score_and_rank_candidates(
     return ranked
 
 
-def process_query_pipeline(raw_query: str, mode: str = "hybrid") -> QueryExplainability:
+def process_query_pipeline(
+    raw_query: str,
+    mode: str = "hybrid",
+    context: Optional[str] = None,
+) -> QueryExplainability:
     """
     Execute full Query Processing Pipeline:
-    Normalize -> Spell Check -> Intent Detection -> Entity Extraction -> Gemini/Fallback Reformulation -> Candidate Scoring -> Explainability.
+    Normalize -> Spell Check -> Intent Detection -> Entity Extraction ->
+    Dynamic Multi-LLM Reformulation (Groq -> Cloudflare -> Gemini -> Ollama Local -> Fallback) ->
+    Candidate Scoring -> Explainability.
     """
     start_time = time.time()
 
@@ -231,15 +364,22 @@ def process_query_pipeline(raw_query: str, mode: str = "hybrid") -> QueryExplain
 
     logger.info(f"[QUERY_PIPELINE] Raw Query: '{raw_query}' -> Cleaned: '{corrected}' | Intent: {intent} | Entities: {entities}")
 
-    # 5. Reformulation (Gemini with algorithmic fallback)
-    candidates_raw = call_gemini_query_reformulation(corrected, intent, entities)
-    is_gemini_used = candidates_raw is not None
+    # 5. Dynamic Multi-LLM Reformulation with local Ollama & algorithmic fallback
+    from app.services.reformulation import multi_llm_reformulation_service
+
+    candidates_raw, provider_used = multi_llm_reformulation_service.reformulate(
+        query=corrected,
+        intent=intent,
+        entities=entities,
+        context=context,
+    )
 
     if not candidates_raw:
-        logger.info("[QUERY_PIPELINE] Gemini API skipped/unavailable. Generating algorithmic fallback candidate reformulations.")
+        logger.info("[QUERY_PIPELINE] LLM providers unavailable. Generating algorithmic fallback candidate reformulations.")
         candidates_raw = generate_fallback_candidate_queries(corrected, intent, entities, keywords)
+        provider_used = "Algorithmic Fallback"
     else:
-        logger.info(f"[QUERY_PIPELINE] Gemini 2.5 Flash generated {len(candidates_raw)} candidate query reformulations.")
+        logger.info(f"[QUERY_PIPELINE] {provider_used} generated {len(candidates_raw)} candidate query reformulations.")
 
     # 6. Candidate Ranking
     ranked_candidates = score_and_rank_candidates(corrected, candidates_raw, intent, entities)
@@ -251,10 +391,36 @@ def process_query_pipeline(raw_query: str, mode: str = "hybrid") -> QueryExplain
     added_keywords = list(set(keywords + [w.lower() for w in best_candidate.query.split() if len(w) > 4 and w.lower() not in raw_query.lower()]))[:5]
 
     # 7. Short Explanation
-    if is_gemini_used:
-        explanation = f"Query was reformulated using Gemini 2.5 AI model. Detected intent '{intent}' and enriched with technical terms ({', '.join(entities) if entities else 'domain context'})."
+    spell_note = ""
+    if corrected_terms:
+        spell_note = f" Spelling corrected: {'; '.join(corrected_terms)}."
+
+    intent_labels = {
+        "TROUBLESHOOTING": "troubleshooting / error resolution",
+        "COMPARISON": "comparison and evaluation",
+        "CONCEPTUAL_EXPLANATION": "conceptual explanation",
+        "DOCUMENT_SEARCH": "document retrieval",
+        "GENERAL_SEARCH": "general information search",
+        "TECHNICAL_SEARCH": "technical search",
+    }
+    intent_label = intent_labels.get(intent, intent.lower().replace("_", " "))
+
+    if provider_used and provider_used != "Algorithmic Fallback":
+        explanation = (
+            f"Query reformulated via {provider_used} for {intent_label}."
+            f"{spell_note}"
+            f" Enriched with: {', '.join(entities) if entities else 'semantic context'}."
+        )
     else:
-        explanation = f"Query was cleaned and algorithmically expanded based on intent '{intent}'. Enriched with domain entities ({', '.join(entities) if entities else 'keywords'}) for high RAG precision."
+        if entities:
+            enrichment = f"entities: {', '.join(entities)}"
+        elif corrected_terms:
+            enrichment = "corrected vocabulary"
+        else:
+            enrichment = "semantic keyword expansion"
+        explanation = (
+            f"Algorithmically expanded for {intent_label}.{spell_note} Enriched with {enrichment}."
+        )
 
     return QueryExplainability(
         original_query=raw_query,
@@ -265,6 +431,8 @@ def process_query_pipeline(raw_query: str, mode: str = "hybrid") -> QueryExplain
         entities=entities,
         added_keywords=added_keywords,
         confidence_score=best_candidate.score,
-        explanation=explanation
+        explanation=explanation,
+        provider_used=provider_used,
     )
+
 

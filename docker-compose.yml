@@ -10,24 +10,38 @@ services:
       - "8000:8000"
     environment:
       - ENVIRONMENT=production
+      - DEBUG=False
+      - CHROMADB_PATH=/app/data/chroma
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - CHROMADB_STORAGE_PATH=/app/data/chromadb
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=${GROQ_MODEL:-llama-3.1-8b-instant}
+      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID}
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN}
+      - JWT_SECRET=${JWT_SECRET}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - EMPLOYEE_USERNAME=${EMPLOYEE_USERNAME:-employee}
+      - EMPLOYEE_PASSWORD=${EMPLOYEE_PASSWORD}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     volumes:
-      - chromadb_data:/app/data/chromadb
+      - backend_data:/app/data
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
     container_name: query-engine-frontend
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api/v1
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000/api/v1}
     depends_on:
       - backend
     restart: unless-stopped
 
 volumes:
-  chromadb_data:
+  backend_data:

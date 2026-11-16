@@ -12,10 +12,15 @@ An enterprise-grade, high-performance RAG and query reformulation platform built
    - Sliding overlap chunking (`chunk_size=500`, `chunk_overlap=50`).
    - High-performance vector embeddings via `SentenceTransformerEmbeddingFunction` (`BAAI/bge-small-en-v1.5` / `all-MiniLM-L6-v2`) in ChromaDB.
 
-2. **Query Reformulation & Expansion**:
-   - Powered by **Google Gemini 2.5 Flash** (`google-genai` SDK).
-   - Extracts intent (`TROUBLESHOOTING`, `TECHNICAL_SEARCH`, `CONCEPTUAL_EXPLANATION`) and domain entities.
-   - Expands raw queries into 5 candidate reformulations with strategy scoring.
+2. **Dynamic Multi-LLM Query Reformulation (Free-Quota Only)**:
+   - Dynamic multi-provider orchestration with configurable fallback order (`REFORMULATION_PROVIDER_ORDER="groq,cloudflare,gemini,ollama"`).
+   - **Groq API**: High-speed free tier (`llama-3.1-8b-instant`).
+   - **Cloudflare Workers AI**: REST API using free daily quota (`@cf/meta/llama-3.1-8b-instruct`).
+   - **Local Ollama**: Local offline inference via `qwen2.5:3b` at `http://localhost:11434` (zero quota consumption, zero cloud cost).
+   - **Google Gemini**: Preserved `gemini-2.5-flash` integration via `google-genai` SDK.
+   - **SambaNova**: Supported as an optional provider.
+   - **Immediate Failover**: On HTTP 429 (rate limits) or timeouts, fails over immediately to the next provider or local Ollama without infinite retries.
+   - **Algorithmic Fallback**: Intent-specific generator ensures zero system downtime if all hosted/local providers are unreachable.
 
 3. **Dual-Path Hybrid Retrieval & BGE Reranking**:
    - **BM25 Lexical Keyword Search** + **ChromaDB Dense Vector Search**.
@@ -69,6 +74,29 @@ VERSION=1.0.0
 # Google Gemini AI Credentials
 GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-2.5-flash
+
+# Dynamic Multi-LLM Query Reformulation (Free-Quota Only)
+# Free-tier availability and limits depend on each provider's current policy.
+REFORMULATION_PROVIDER_ORDER="groq,cloudflare,gemini,ollama"
+REFORMULATION_TIMEOUT_SECONDS=5.0
+REFORMULATION_MAX_RETRIES=1
+
+# Groq (Free Tier: https://console.groq.com)
+GROQ_API_KEY=your_groq_api_key_here
+GROQ_MODEL=llama-3.1-8b-instant
+
+# Cloudflare Workers AI (Free Tier: 10,000 neurons/day)
+CLOUDFLARE_ACCOUNT_ID=your_cloudflare_account_id_here
+CLOUDFLARE_API_TOKEN=your_cloudflare_api_token_here
+CLOUDFLARE_MODEL=@cf/meta/llama-3.1-8b-instruct
+
+# Local Ollama (Free Local Inference, zero quota usage)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=qwen2.5:3b
+
+# SambaNova (Optional; kept optional until 429 resolution)
+SAMBANOVA_API_KEY=your_sambanova_api_key_here
+SAMBANOVA_MODEL=Meta-Llama-3.1-8B-Instruct
 
 # Vector Store & Embedding Configuration
 CHROMADB_STORAGE_PATH=./data/chromadb
@@ -128,6 +156,12 @@ docker-compose up --build
 ---
 
 ## 🧪 Testing & Validation
+
+### Run Dynamic Multi-LLM Query Reformulation Test Suite
+```bash
+cd backend
+venv\Scripts\python.exe test_reformulation_suite.py
+```
 
 ### Run Complete End-to-End Pipeline Verification Suite
 ```bash
