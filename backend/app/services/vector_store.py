@@ -1,4 +1,5 @@
 import uuid
+import hashlib
 import logging
 import math
 import re
@@ -30,12 +31,18 @@ class FastFeatureEmbeddingFunction:
         words = re.findall(r"\b\w+\b", clean_text)
         
         for word in words:
-            idx = abs(hash(word)) % self.vector_dim
+            idx = int.from_bytes(
+        hashlib.blake2b(word.encode("utf-8"), digest_size=8).digest(),
+        "big"
+        ) % self.vector_dim
             vec[idx] += 1.0
 
         for i in range(len(clean_text) - 2):
             ngram = clean_text[i:i+3]
-            idx = abs(hash(ngram)) % self.vector_dim
+            idx = int.from_bytes(
+        hashlib.blake2b(ngram.encode("utf-8"), digest_size=8).digest(),
+        "big"
+        ) % self.vector_dim
             vec[idx] += 0.5
 
         norm = math.sqrt(sum(x * x for x in vec))
@@ -63,23 +70,38 @@ _cached_embedding_fn = None
 
 def get_embedding_function():
     """
-    Return SentenceTransformers embedding function (Primary) or FastFeature embedding function (Fallback).
-    Satisfies ChromaDB EmbeddingFunction protocol.
+    Return lightweight embeddings on Render when enabled.
+    Otherwise, use SentenceTransformers with FastFeature fallback.
     """
     global _cached_embedding_fn
+
     if _cached_embedding_fn is not None:
+        return _cached_embedding_fn
+
+    import os
+
+    use_lightweight = os.getenv("USE_LIGHTWEIGHT_EMBEDDINGS", "false").lower() == "true"
+
+    if use_lightweight:
+        print("[Embeddings] Using lightweight FastFeature embeddings")
+        _cached_embedding_fn = FastFeatureEmbeddingFunction()
         return _cached_embedding_fn
 
     try:
         from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+
         model_name = settings.EMBEDDING_MODEL_NAME or "all-MiniLM-L6-v2"
-        logger.info(f"[VECTOR_STORE] Initializing SentenceTransformers embedding function with model '{model_name}'")
-        _cached_embedding_fn = SentenceTransformerEmbeddingFunction(model_name=model_name)
-        return _cached_embedding_fn
+        _cached_embedding_fn = SentenceTransformerEmbeddingFunction(
+            model_name=model_name
+        )
+        print(f"[Embeddings] Using SentenceTransformers: {model_name}")
+
     except Exception as e:
-        logger.warning(f"[VECTOR_STORE] SentenceTransformers embedding initialization warning: {str(e)}. Using FastFeature fallback.")
+        print(f"[Embeddings] SentenceTransformers unavailable: {e}")
+        print("[Embeddings] Falling back to FastFeature embeddings")
         _cached_embedding_fn = FastFeatureEmbeddingFunction()
-        return _cached_embedding_fn
+
+    return _cached_embedding_fn
 
 
 class VectorStoreService:
