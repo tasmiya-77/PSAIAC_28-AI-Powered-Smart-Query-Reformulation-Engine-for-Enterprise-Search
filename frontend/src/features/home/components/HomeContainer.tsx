@@ -1,6 +1,7 @@
-"use client";
+﻿"use client";
 
 import React, { useState } from "react";
+import { apiClient } from "@/lib/api-client";
 import { HeroSection } from "./HeroSection";
 import { SearchBarSection } from "./SearchBarSection";
 import { SuggestionChipsSection } from "./SuggestionChipsSection";
@@ -31,29 +32,53 @@ const initialHistory: SearchHistoryItem[] = [
 export const HomeContainer: React.FC = () => {
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
   const [history, setHistory] = useState<SearchHistoryItem[]>(initialHistory);
 
-  const handleSearchSubmit = (submittedQuery: string, mode: string) => {
+  const handleSearchSubmit = async (submittedQuery: string, mode: string) => {
+    if (!submittedQuery.trim()) return;
+
     setIsLoading(true);
-    setTimeout(() => {
+    setError("");
+
+    try {
+      const response = await apiClient.reformulateQuery({
+        query: submittedQuery.trim(),
+        mode,
+      });
+
+      if (!response.success || !response.data) {
+        throw new Error("Query reformulation failed.");
+      }
+
+      const result = response.data;
+
       const newItem: SearchHistoryItem = {
         id: `hist-${Date.now()}`,
-        originalQuery: submittedQuery,
+        originalQuery: result.original_query,
         expandedTerms: [
-          `${submittedQuery} semantics`,
-          `synonym expansion`,
-          `vector embedding match`,
-        ],
+          result.best_query,
+          ...result.added_keywords,
+        ].filter(Boolean),
         mode: mode.toUpperCase(),
         timestamp: "Just now",
-        hitCount: Math.floor(Math.random() * 100) + 20,
+        hitCount: 0,
+        provider: result.provider_used || "Unknown",
+        confidence: result.confidence_score,
       };
 
       setHistory((prev) => [newItem, ...prev]);
+    } catch (err) {
+      console.error("Query reformulation error:", err);
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to connect to the backend."
+      );
+    } finally {
       setIsLoading(false);
-    }, 600);
+    }
   };
-
   const handleSelectQuery = (selected: string) => {
     setQuery(selected);
   };
@@ -80,6 +105,9 @@ export const HomeContainer: React.FC = () => {
       />
 
       {/* 3. "Try these queries" Suggestion Chips */}
+      {error && (
+        <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-500">{error}</div>
+      )}
       <SuggestionChipsSection onSelectQuery={handleSelectQuery} />
 
       {/* 4. Quick Actions Cards */}
@@ -101,3 +129,4 @@ export const HomeContainer: React.FC = () => {
     </div>
   );
 };
+

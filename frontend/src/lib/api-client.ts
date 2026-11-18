@@ -1,4 +1,4 @@
-import { HealthCheckResponse, ApiError, DocumentListItem } from "@/types/api";
+﻿import { HealthCheckResponse, ApiError, DocumentListItem, QueryExplainability } from "@/types/api";
 import { SearchRequest, SearchResponse } from "@/types/search";
 
 const API_BASE_URL =
@@ -75,6 +75,12 @@ export class ApiClient {
   /**
    * Fetch list of ingested vector documents
    */
+  async reformulateQuery(payload: { query: string; mode?: string }): Promise<{ success: boolean; processing_time_ms: number; data: QueryExplainability }> {
+    return this.request("/query/reformulate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
   async getDocuments(): Promise<{ documents: DocumentListItem[]; total_chunks: number }> {
     return this.request<{ documents: DocumentListItem[]; total_chunks: number }>("/ingest/documents");
   }
@@ -161,4 +167,5 @@ export class ApiClient {
 }
 
 export const apiClient = new ApiClient();
+
 

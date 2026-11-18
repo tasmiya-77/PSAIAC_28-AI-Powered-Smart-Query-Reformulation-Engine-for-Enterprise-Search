@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React from "react";
 import { motion } from "framer-motion";
@@ -12,7 +12,9 @@ export interface SearchHistoryItem {
   expandedTerms: string[];
   mode: string;
   timestamp: string;
-  hitCount: number;
+  hitCount?: number;
+  provider?: string;
+  confidence?: number;
 }
 
 interface RecentSearchesSectionProps {
@@ -104,7 +106,10 @@ export const RecentSearchesSection: React.FC<RecentSearchesSectionProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between sm:justify-end gap-3 text-xs text-slate-400 border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-800">
-                    <span className="font-mono text-emerald-400">{item.hitCount} hits</span>
+                    <span className="font-mono text-emerald-400">{item.provider || "AI"}</span>
+                    {item.confidence !== undefined && (
+                      <span>{Math.round(item.confidence * 100)}% confidence</span>
+                    )}
                     <span className="text-[11px] text-slate-500">{item.timestamp}</span>
                     <button
                       onClick={() => onRemoveItem(item.id)}
@@ -123,3 +128,5 @@ export const RecentSearchesSection: React.FC<RecentSearchesSectionProps> = ({
     </motion.div>
   );
 };
+
+
